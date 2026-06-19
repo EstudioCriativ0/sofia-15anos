@@ -41,18 +41,27 @@ distribuição ou utilização comercial deste código, total ou parcial, sem au
       width: 100%;
       display: flex;
       justify-content: center;
-      gap: 40px;
+      gap: 22px;
       z-index: 10;
+      padding: 0 14px;
     }
     button {
-      width: 70px;
-      height: 70px;
+      width: 66px;
+      height: 66px;
       border-radius: 50%;
-      border: none;
-      background: white;
-      font-size: 28px;
+      border: 1px solid rgba(255,255,255,0.65);
+      background: rgba(255,255,255,0.22);
+      color: #fff;
+      font-size: 27px;
       cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.55);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.45);
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
     #preview-container {
       position: absolute;
@@ -174,9 +183,11 @@ distribuição ou utilização comercial deste código, total ou parcial, sem au
   <div id="buttons">
     <button id="switch-camera" title="Trocar câmera">🔄</button>
     <button id="capture" title="Tirar foto">📸</button>
+    <button id="upload-photo" title="Usar foto da galeria">🖼️</button>
     <button id="start-recording" title="Gravar vídeo">🎥</button>
     <button id="stop-recording" title="Parar gravação" style="display:none;">⏹</button>
   </div>
+  <input id="gallery-input" type="file" accept="image/*" style="display:none;" />
 
   <canvas id="canvas" style="display:none;"></canvas>
   <canvas id="recordingCanvas" style="display:none;"></canvas>
@@ -231,6 +242,8 @@ distribuição ou utilização comercial deste código, total ou parcial, sem au
     const canvas = document.getElementById('canvas');
     const captureBtn = document.getElementById('capture');
     const switchCameraBtn = document.getElementById('switch-camera');
+    const uploadPhotoBtn = document.getElementById('upload-photo');
+    const galleryInput = document.getElementById('gallery-input');
     const photoPreview = document.getElementById('photo-preview');
     const previewContainer = document.getElementById('preview-container');
     const saveBtn = document.getElementById('save-btn');
@@ -273,6 +286,7 @@ distribuição ou utilização comercial deste código, total ou parcial, sem au
     function setButtonsDisabledDuringProcess(disabled) {
       switchCameraBtn.disabled = disabled;
       captureBtn.disabled = disabled;
+      uploadPhotoBtn.disabled = disabled;
       startRecordBtn.disabled = disabled;
       stopRecordBtn.disabled = disabled;
     }
@@ -323,6 +337,82 @@ distribuição ou utilização comercial deste código, total ou parcial, sem au
       const dataUrl = canvas.toDataURL('image/png');
       photoPreview.src = dataUrl;
       previewContainer.style.display = 'flex';
+    };
+
+    function drawImageCover(ctx, img, width, height) {
+      const imgRatio = img.width / img.height;
+      const canvasRatio = width / height;
+      let drawWidth;
+      let drawHeight;
+      let offsetX;
+      let offsetY;
+
+      if (imgRatio > canvasRatio) {
+        drawHeight = height;
+        drawWidth = height * imgRatio;
+        offsetX = (width - drawWidth) / 2;
+        offsetY = 0;
+      } else {
+        drawWidth = width;
+        drawHeight = width / imgRatio;
+        offsetX = 0;
+        offsetY = (height - drawHeight) / 2;
+      }
+
+      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+    }
+
+    // FOTO DA GALERIA
+    uploadPhotoBtn.onclick = () => {
+      if (isRecording) return;
+      galleryInput.value = '';
+      galleryInput.click();
+    };
+
+    galleryInput.onchange = () => {
+      const file = galleryInput.files && galleryInput.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        alert('Escolha uma imagem da galeria para aplicar a moldura.');
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        const img = new Image();
+
+        img.onload = () => {
+          const width = overlay.naturalWidth || 1080;
+          const height = overlay.naturalHeight || 1920;
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, width, height);
+          drawImageCover(ctx, img, width, height);
+          ctx.drawImage(overlay, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/png');
+          photoPreview.src = dataUrl;
+          previewContainer.style.display = 'flex';
+          instructions.style.display = 'none';
+        };
+
+        img.onerror = () => {
+          alert('Não foi possível carregar essa imagem. Tente escolher outra foto.');
+        };
+
+        img.src = reader.result;
+      };
+
+      reader.onerror = () => {
+        alert('Não foi possível abrir essa imagem. Tente novamente.');
+      };
+
+      reader.readAsDataURL(file);
     };
 
     saveBtn.onclick = () => {
